@@ -15,8 +15,6 @@
 namespace concurrent_maintenance
 {
 
-class CMObject;
-
 inline sdbusplus::async::task<>
     fsiCardRemove(std::reference_wrapper<sdbusplus::async::context> /*ctx*/,
                   std::string fruPath,

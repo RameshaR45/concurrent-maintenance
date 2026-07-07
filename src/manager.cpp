@@ -79,12 +79,13 @@ sdbusplus::async::task<> Manager::watchReadyToRemove()
         }
     }
 }
-// NOLINTEND(clang-analyzer-core.uninitialized.Branch)
 
 sdbusplus::async::task<> Manager::processCMRequest(bool readyToRemove,
                                                    std::string fruPath)
 {
-    if (currentCMObject)
+    /* If a CM operation is actively InProgress, drop concurrent requests */
+    if (currentCMObject &&
+        currentCMObject->getStatus() == OperationStatus::InProgress)
     {
         lg2::error("CM is already in progress. Object already exists at path:"
                    " {PATH}. Dropping request for {FRUPATH}.",
@@ -130,9 +131,6 @@ sdbusplus::async::task<> Manager::processCMRequest(bool readyToRemove,
 
     currentCMObject = std::make_unique<CMObject>(ctx, cmPath, fruPath);
 
-    lg2::info("CM object created at {CMPATH} for FRU {FRUPATH}", "CMPATH",
-              currentCMObject->getPath(), "FRUPATH", fruPath);
-
     try
     {
         co_await currentCMObject->execute(readyToRemove, *ops);
@@ -144,7 +142,7 @@ sdbusplus::async::task<> Manager::processCMRequest(bool readyToRemove,
                    "ERROR", e);
     }
 
-    currentCMObject.reset();
+    /* Keep currentCMObject on D-Bus until the next event arrives */
 }
 
 } // namespace concurrent_maintenance
