@@ -54,19 +54,19 @@ TEST_F(ManagerTest, SingleCMGuardRejectsSecondRequest)
     runAsync([](sdbusplus::async::context& ctx) -> sdbusplus::async::task<> {
         Manager manager(ctx);
 
-        // First call — should create the CM object
+        // First call — should create the remove CM object
         ManagerTest::callManageCMObject(manager, true);
         EXPECT_FALSE(ManagerTest::isCMObjectNull(manager));
+        EXPECT_EQ(ManagerTest::getCurrentCMObjectPath(manager),
+                  "/com/ibm/ConcurrentMaintenance/remove");
 
-        const std::string firstPath =
-            ManagerTest::getCurrentCMObjectPath(manager);
-
-        // Second call while CM is in progress — should be rejected
+        // Second call while CM is in progress — must be rejected
         ManagerTest::callManageCMObject(manager, false);
 
-        // currentCMObject must still point to the original object
+        // currentCMObject must still point to the original remove object
         EXPECT_FALSE(ManagerTest::isCMObjectNull(manager));
-        EXPECT_EQ(ManagerTest::getCurrentCMObjectPath(manager), firstPath);
+        EXPECT_EQ(ManagerTest::getCurrentCMObjectPath(manager),
+                  "/com/ibm/ConcurrentMaintenance/remove");
 
         co_return;
     });

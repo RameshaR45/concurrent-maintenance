@@ -4,11 +4,20 @@
 #pragma once
 
 #include <sdbusplus/async/context.hpp>
+#include <sdbusplus/server/object.hpp>
+#include <xyz/openbmc_project/Common/Progress/server.hpp>
 
+#include <memory>
 #include <string>
 
 namespace concurrent_maintenance
 {
+
+using ProgressIntf = sdbusplus::server::object_t<
+    sdbusplus::xyz::openbmc_project::Common::server::Progress>;
+
+using OperationStatus =
+    sdbusplus::xyz::openbmc_project::Common::server::Progress::OperationStatus;
 
 class CMObject
 {
@@ -22,14 +31,16 @@ class CMObject
 
     ~CMObject() = default;
 
-    // Get the object path
     const std::string& getPath() const
     {
         return objectPath;
     }
 
+    void updateStatus(OperationStatus status);
+
   private:
     std::string objectPath;
+    std::unique_ptr<ProgressIntf> progressIntf;
 };
 
 } // namespace concurrent_maintenance

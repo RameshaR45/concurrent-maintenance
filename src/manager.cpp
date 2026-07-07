@@ -9,7 +9,6 @@
 #include <sdbusplus/message.hpp>
 
 #include <map>
-#include <string>
 #include <variant>
 
 namespace concurrent_maintenance
@@ -27,7 +26,6 @@ Manager::Manager(sdbusplus::async::context& ctx) : ctx(ctx)
 // NOLINTBEGIN(clang-analyzer-core.uninitialized.Branch)
 void Manager::start()
 {
-    // Spawn coroutine to watch for ReadyToRemove property changes
     ctx.spawn(watchReadyToRemove());
 }
 
@@ -53,7 +51,7 @@ sdbusplus::async::task<> Manager::watchReadyToRemove()
 
         try
         {
-            auto [interface, changedProperties] =
+            auto [_, changedProperties] =
                 msg.unpack<std::string, ChangedProperties>();
 
             const auto it = changedProperties.find(readyToRemoveProperty);
@@ -80,7 +78,6 @@ sdbusplus::async::task<> Manager::watchReadyToRemove()
 
 void Manager::manageCMObject(bool readyToRemove)
 {
-    // Only one CM at a time, reject if a CM is already in progress
     if (currentCMObject)
     {
         lg2::error(
@@ -92,10 +89,8 @@ void Manager::manageCMObject(bool readyToRemove)
     const std::string path = readyToRemove ? cmRemoveObjectPath
                                            : cmAddObjectPath;
 
-    lg2::info("Creating CM object at {PATH}", "PATH", path);
     currentCMObject = std::make_unique<CMObject>(ctx, path);
-    lg2::info("CM object created at {PATH}", "PATH",
-              currentCMObject->getPath());
+    currentCMObject->updateStatus(OperationStatus::InProgress);
 }
 
 } // namespace concurrent_maintenance

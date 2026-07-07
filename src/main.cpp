@@ -13,7 +13,7 @@ int main()
 
     // Create ObjectManager for concurrent maintenance dbus objects
     constexpr auto objManagerPath = "/com/ibm/ConcurrentMaintenance";
-    sdbusplus::server::manager_t dbusObjManager(ctx, objManagerPath);
+    sdbusplus::server::manager_t dbusObjManager(ctx.get_bus(), objManagerPath);
 
     concurrent_maintenance::Manager cmManager(ctx);
 
