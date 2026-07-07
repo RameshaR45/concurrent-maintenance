@@ -130,9 +130,6 @@ sdbusplus::async::task<> Manager::processCMRequest(bool readyToRemove,
 
     currentCMObject = std::make_unique<CMObject>(ctx, cmPath, fruPath);
 
-    lg2::info("CM object created at {CMPATH} for FRU {FRUPATH}", "CMPATH",
-              currentCMObject->getPath(), "FRUPATH", fruPath);
-
     try
     {
         co_await currentCMObject->execute(readyToRemove, *ops);
