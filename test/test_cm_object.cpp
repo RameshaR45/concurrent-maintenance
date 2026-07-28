@@ -36,7 +36,7 @@ static const std::vector<std::string> fsiInterfaces = {
 };
 static const std::vector<std::string> bmcInterfaces = {
     "xyz.openbmc_project.Inventory.Item",
-    "xyz.openbmc_project.Inventory.Item.Board",
+    "xyz.openbmc_project.Common.PhysicalContext",
     "xyz.openbmc_project.State.ReadyToRemove",
 };
 static const std::vector<std::string> switchboardInterfaces = {
@@ -64,7 +64,18 @@ TEST(CMObjectTest, AddPathIsCorrect)
     EXPECT_EQ(obj.getPath(), cmAddPath);
 }
 
-TEST(CMObjectTest, ExecuteRemoveFSI)
+// Progress: initial status is NotStarted
+
+TEST(CMObjectTest, InitialStatusIsNotStarted)
+{
+    sdbusplus::async::context ctx;
+    CMObject obj(ctx, cmRemovePath, fsiFruPath);
+    EXPECT_EQ(obj.getStatus(), OperationStatus::NotStarted);
+}
+
+// Progress: execute() drives NotStarted -> InProgress -> Completed
+
+TEST(CMObjectTest, ExecuteRemoveFSISetsCompleted)
 {
     sdbusplus::async::context ctx;
     CMObject obj(ctx, cmRemovePath, fsiFruPath);
@@ -72,9 +83,10 @@ TEST(CMObjectTest, ExecuteRemoveFSI)
                                                            fsiFruPath);
     ASSERT_NE(ops, nullptr);
     EXPECT_NO_THROW(stdexec::sync_wait(obj.execute(true, *ops)));
+    EXPECT_EQ(obj.getStatus(), OperationStatus::Completed);
 }
 
-TEST(CMObjectTest, ExecuteAddFSI)
+TEST(CMObjectTest, ExecuteAddFSISetsCompleted)
 {
     sdbusplus::async::context ctx;
     CMObject obj(ctx, cmAddPath, fsiFruPath);
@@ -82,9 +94,10 @@ TEST(CMObjectTest, ExecuteAddFSI)
                                                            fsiFruPath);
     ASSERT_NE(ops, nullptr);
     EXPECT_NO_THROW(stdexec::sync_wait(obj.execute(false, *ops)));
+    EXPECT_EQ(obj.getStatus(), OperationStatus::Completed);
 }
 
-TEST(CMObjectTest, ExecuteRemoveBMC)
+TEST(CMObjectTest, ExecuteRemoveBMCSetsCompleted)
 {
     sdbusplus::async::context ctx;
     CMObject obj(ctx, cmRemovePath, bmcFruPath);
@@ -92,9 +105,10 @@ TEST(CMObjectTest, ExecuteRemoveBMC)
                                                            bmcFruPath);
     ASSERT_NE(ops, nullptr);
     EXPECT_NO_THROW(stdexec::sync_wait(obj.execute(true, *ops)));
+    EXPECT_EQ(obj.getStatus(), OperationStatus::Completed);
 }
 
-TEST(CMObjectTest, ExecuteAddBMC)
+TEST(CMObjectTest, ExecuteAddBMCSetsCompleted)
 {
     sdbusplus::async::context ctx;
     CMObject obj(ctx, cmAddPath, bmcFruPath);
@@ -102,9 +116,10 @@ TEST(CMObjectTest, ExecuteAddBMC)
                                                            bmcFruPath);
     ASSERT_NE(ops, nullptr);
     EXPECT_NO_THROW(stdexec::sync_wait(obj.execute(false, *ops)));
+    EXPECT_EQ(obj.getStatus(), OperationStatus::Completed);
 }
 
-TEST(CMObjectTest, ExecuteRemoveSwitchboard)
+TEST(CMObjectTest, ExecuteRemoveSwitchboardSetsCompleted)
 {
     sdbusplus::async::context ctx;
     CMObject obj(ctx, cmRemovePath, switchboardFruPath);
@@ -112,9 +127,10 @@ TEST(CMObjectTest, ExecuteRemoveSwitchboard)
         FRUIdentifier::identifyType(switchboardInterfaces, switchboardFruPath);
     ASSERT_NE(ops, nullptr);
     EXPECT_NO_THROW(stdexec::sync_wait(obj.execute(true, *ops)));
+    EXPECT_EQ(obj.getStatus(), OperationStatus::Completed);
 }
 
-TEST(CMObjectTest, ExecuteAddSwitchboard)
+TEST(CMObjectTest, ExecuteAddSwitchboardSetsCompleted)
 {
     sdbusplus::async::context ctx;
     CMObject obj(ctx, cmAddPath, switchboardFruPath);
@@ -122,6 +138,25 @@ TEST(CMObjectTest, ExecuteAddSwitchboard)
         FRUIdentifier::identifyType(switchboardInterfaces, switchboardFruPath);
     ASSERT_NE(ops, nullptr);
     EXPECT_NO_THROW(stdexec::sync_wait(obj.execute(false, *ops)));
+    EXPECT_EQ(obj.getStatus(), OperationStatus::Completed);
+}
+
+// Progress: updateStatus transitions
+
+TEST(CMObjectTest, UpdateStatusToInProgress)
+{
+    sdbusplus::async::context ctx;
+    CMObject obj(ctx, cmRemovePath, fsiFruPath);
+    obj.updateStatus(OperationStatus::InProgress);
+    EXPECT_EQ(obj.getStatus(), OperationStatus::InProgress);
+}
+
+TEST(CMObjectTest, UpdateStatusToFailed)
+{
+    sdbusplus::async::context ctx;
+    CMObject obj(ctx, cmRemovePath, fsiFruPath);
+    obj.updateStatus(OperationStatus::Failed);
+    EXPECT_EQ(obj.getStatus(), OperationStatus::Failed);
 }
 
 TEST(CMObjectTest, IdentifyTypeUnknownFRUReturnsNull)

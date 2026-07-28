@@ -79,7 +79,6 @@ sdbusplus::async::task<> Manager::watchReadyToRemove()
         }
     }
 }
-// NOLINTEND(clang-analyzer-core.uninitialized.Branch)
 
 sdbusplus::async::task<> Manager::processCMRequest(bool readyToRemove,
                                                    std::string fruPath)
@@ -129,9 +128,6 @@ sdbusplus::async::task<> Manager::processCMRequest(bool readyToRemove,
                                              : cmAddObjectPath;
 
     currentCMObject = std::make_unique<CMObject>(ctx, cmPath, fruPath);
-
-    lg2::info("CM object created at {CMPATH} for FRU {FRUPATH}", "CMPATH",
-              currentCMObject->getPath(), "FRUPATH", fruPath);
 
     try
     {

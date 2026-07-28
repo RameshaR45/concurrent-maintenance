@@ -26,7 +26,8 @@ bool hasInterface(const std::vector<std::string>& interfaces,
 bool matchBmcCard(const std::vector<std::string>& interfaces,
                   const std::string& /*fruPath*/)
 {
-    return hasInterface(interfaces, "xyz.openbmc_project.Inventory.Item.Board");
+    return hasInterface(interfaces,
+                        "xyz.openbmc_project.Common.PhysicalContext");
 }
 
 bool matchFsiCard(const std::vector<std::string>& interfaces,
