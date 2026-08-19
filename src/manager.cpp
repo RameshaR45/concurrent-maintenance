@@ -3,31 +3,33 @@
 
 #include "manager.hpp"
 
+#include "cm_object.hpp"
+#include "fru_identifier.hpp"
+
 #include <phosphor-logging/lg2.hpp>
 #include <sdbusplus/async/match.hpp>
 #include <sdbusplus/bus/match.hpp>
 #include <sdbusplus/message.hpp>
+#include <xyz/openbmc_project/ObjectMapper/client.hpp>
 
 #include <map>
 #include <string>
 #include <variant>
+#include <vector>
 
 namespace concurrent_maintenance
 {
+
+using ObjectMapper = sdbusplus::client::xyz::openbmc_project::ObjectMapper<>;
 
 constexpr auto readyToRemoveProperty = "ReadyToRemove";
 constexpr auto cmRemoveObjectPath = "/com/ibm/ConcurrentMaintenance/remove";
 constexpr auto cmAddObjectPath = "/com/ibm/ConcurrentMaintenance/add";
 
-Manager::Manager(sdbusplus::async::context& ctx) : ctx(ctx)
+Manager::Manager(sdbusplus::async::context& ctx) :
+    ctx(ctx), currentCMObject(nullptr)
 {
     lg2::info("Concurrent Maintenance manager initialized");
-}
-
-// NOLINTBEGIN(clang-analyzer-core.uninitialized.Branch)
-void Manager::start()
-{
-    // Spawn coroutine to watch for ReadyToRemove property changes
     ctx.spawn(watchReadyToRemove());
 }
 
@@ -47,7 +49,7 @@ sdbusplus::async::task<> Manager::watchReadyToRemove()
     lg2::info(
         "ReadyToRemove property watcher registered for all inventory objects");
 
-    while (true)
+    while (!ctx.stop_requested())
     {
         auto msg = co_await matcher.next();
 
@@ -63,11 +65,12 @@ sdbusplus::async::task<> Manager::watchReadyToRemove()
             }
 
             bool readyToRemove = std::get<bool>(it->second);
-            const auto& objectPath = msg.get_path();
-            lg2::info("ReadyToRemove property changed on {PATH}: {VALUE}",
-                      "PATH", objectPath, "VALUE", readyToRemove);
+            std::string fruPath = msg.get_path();
 
-            manageCMObject(readyToRemove);
+            lg2::info("ReadyToRemove property changed on {PATH}: {VALUE}",
+                      "PATH", fruPath, "VALUE", readyToRemove);
+
+            co_await processCMRequest(readyToRemove, std::move(fruPath));
         }
         catch (const std::exception& e)
         {
@@ -78,24 +81,70 @@ sdbusplus::async::task<> Manager::watchReadyToRemove()
 }
 // NOLINTEND(clang-analyzer-core.uninitialized.Branch)
 
-void Manager::manageCMObject(bool readyToRemove)
+sdbusplus::async::task<> Manager::processCMRequest(bool readyToRemove,
+                                                   std::string fruPath)
 {
-    // Only one CM at a time, reject if a CM is already in progress
     if (currentCMObject)
     {
-        lg2::error(
-            "CM is already in progress. Object already exists at path: {PATH}.",
-            "PATH", currentCMObject->getPath());
-        return;
+        lg2::error("CM is already in progress. Object already exists at path:"
+                   " {PATH}. Dropping request for {FRUPATH}.",
+                   "PATH", currentCMObject->getPath(), "FRUPATH", fruPath);
+        co_return;
     }
 
-    const std::string path = readyToRemove ? cmRemoveObjectPath
-                                           : cmAddObjectPath;
+    /* co_await the mapper to obtain the interfaces implemented by this FRU.
+     * This is also a natural yield point that serializes any back-to-back
+     * signals arriving before the first coroutine completes.
+     */
+    std::vector<std::string> interfaces;
+    try
+    {
+        auto result = co_await ObjectMapper(ctx)
+                          .service(ObjectMapper::default_service)
+                          .path(ObjectMapper::instance_path)
+                          .get_object(fruPath, {});
 
-    lg2::info("Creating CM object at {PATH}", "PATH", path);
-    currentCMObject = std::make_unique<CMObject>(ctx, path);
-    lg2::info("CM object created at {PATH}", "PATH",
-              currentCMObject->getPath());
+        for (const auto& [service, ifaces] : result)
+        {
+            interfaces.insert(interfaces.end(), ifaces.begin(), ifaces.end());
+        }
+    }
+    catch (const std::exception& e)
+    {
+        /* Mapper lookup failed; identifyType will be called with an empty
+         * interface list and will return nullptr for unrecognized FRUs. */
+        lg2::warning("Mapper lookup failed for {PATH}: {ERROR}.", "PATH",
+                     fruPath, "ERROR", e);
+    }
+
+    const FRUOperations* ops = FRUIdentifier::identifyType(interfaces, fruPath);
+    if (ops == nullptr)
+    {
+        lg2::error("Unrecognized FRU type for {PATH} — dropping request.",
+                   "PATH", fruPath);
+        co_return;
+    }
+
+    const std::string cmPath = readyToRemove ? cmRemoveObjectPath
+                                             : cmAddObjectPath;
+
+    currentCMObject = std::make_unique<CMObject>(ctx, cmPath, fruPath);
+
+    lg2::info("CM object created at {CMPATH} for FRU {FRUPATH}", "CMPATH",
+              currentCMObject->getPath(), "FRUPATH", fruPath);
+
+    try
+    {
+        co_await currentCMObject->execute(readyToRemove, *ops);
+        lg2::info("CM operation completed for {PATH}", "PATH", fruPath);
+    }
+    catch (const std::exception& e)
+    {
+        lg2::error("CM operation failed for {PATH}: {ERROR}", "PATH", fruPath,
+                   "ERROR", e);
+    }
+
+    currentCMObject.reset();
 }
 
 } // namespace concurrent_maintenance
