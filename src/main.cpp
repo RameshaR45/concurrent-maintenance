@@ -7,7 +7,10 @@
 #include <sdbusplus/async.hpp>
 #include <sdbusplus/server/manager.hpp>
 
+#include <exception>
+
 int main()
+try
 {
     sdbusplus::async::context ctx;
 
@@ -20,9 +23,12 @@ int main()
     ctx.request_name("com.ibm.ConcurrentMaintenance");
     lg2::info("Concurrent Maintenance service started");
 
-    cmManager.start();
-
     ctx.run();
 
     return 0;
+}
+catch (const std::exception& e)
+{
+    lg2::error("Concurrent Maintenance service failed: {ERROR}", "ERROR", e);
+    return 1;
 }
