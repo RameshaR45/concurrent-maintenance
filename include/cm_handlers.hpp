@@ -3,6 +3,7 @@
 
 #pragma once
 
+#include "cm_object.hpp"
 #include "fru_identifier.hpp"
 
 #include <phosphor-logging/lg2.hpp>
@@ -14,8 +15,6 @@
 
 namespace concurrent_maintenance
 {
-
-class CMObject;
 
 inline sdbusplus::async::task<>
     fsiCardRemove(std::reference_wrapper<sdbusplus::async::context> /*ctx*/,

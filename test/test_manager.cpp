@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileCopyrightText: Copyright IBM Corp.
 
+#include "manager.hpp"
+
 #include <sdbusplus/async.hpp>
 
 #include <gtest/gtest.h>
