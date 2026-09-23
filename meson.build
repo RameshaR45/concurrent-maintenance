@@ -8,6 +8,7 @@ project(
 
 sdbusplus_dep = dependency('sdbusplus')
 phosphor_logging_dep = dependency('phosphor-logging')
+phosphor_dbus_interfaces_dep = dependency('phosphor-dbus-interfaces')
 systemd_dep = dependency('systemd')
 
 inc = include_directories('include')
@@ -21,7 +22,11 @@ executable(
         'src/fru_identifier.cpp',
     ],
     include_directories: inc,
-    dependencies: [sdbusplus_dep, phosphor_logging_dep],
+    dependencies: [
+        sdbusplus_dep,
+        phosphor_logging_dep,
+        phosphor_dbus_interfaces_dep,
+    ],
     install: true,
 )
 
