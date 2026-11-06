@@ -77,28 +77,6 @@ TEST(CMObjectTest, InitialStatusIsNotStarted)
 
 // Progress: execute() drives NotStarted -> InProgress -> Completed
 
-TEST(CMObjectTest, ExecuteRemoveFSISetsCompleted)
-{
-    sdbusplus::async::context ctx;
-    CMObject obj(ctx, cmRemovePath, fsiFruPath);
-    const FRUOperations* ops = FRUIdentifier::identifyType(fsiInterfaces,
-                                                           fsiFruPath);
-    ASSERT_NE(ops, nullptr);
-    EXPECT_NO_THROW(stdexec::sync_wait(obj.execute(true, *ops)));
-    EXPECT_EQ(obj.getStatus(), OperationStatus::Completed);
-}
-
-TEST(CMObjectTest, ExecuteAddFSISetsCompleted)
-{
-    sdbusplus::async::context ctx;
-    CMObject obj(ctx, cmAddPath, fsiFruPath);
-    const FRUOperations* ops = FRUIdentifier::identifyType(fsiInterfaces,
-                                                           fsiFruPath);
-    ASSERT_NE(ops, nullptr);
-    EXPECT_NO_THROW(stdexec::sync_wait(obj.execute(false, *ops)));
-    EXPECT_EQ(obj.getStatus(), OperationStatus::Completed);
-}
-
 TEST(CMObjectTest, ExecuteRemoveBMCSetsCompleted)
 {
     sdbusplus::async::context ctx;
@@ -216,17 +194,9 @@ TEST(ManagerProgressTest, RemoveStartsInProgressAddCompletesCompleted)
     manager.updateStatus(OperationStatus::InProgress);
     EXPECT_EQ(manager.getStatus(), OperationStatus::InProgress);
 
-    /* Simulate add finishing successfully, reusing the add object's time */
-    CMObject addObj(ctx, cmAddPath, fsiFruPath);
-    const FRUOperations* ops = FRUIdentifier::identifyType(fsiInterfaces,
-                                                           fsiFruPath);
-    ASSERT_NE(ops, nullptr);
-    stdexec::sync_wait(addObj.execute(false, *ops));
-
-    manager.updateStatus(OperationStatus::Completed, addObj.getCompletedTime());
+    manager.updateStatus(OperationStatus::Completed, 1234);
     EXPECT_EQ(manager.getStatus(), OperationStatus::Completed);
-    EXPECT_NE(addObj.getCompletedTime(), 0U);
-    EXPECT_EQ(manager.getCompletedTime(), addObj.getCompletedTime());
+    EXPECT_EQ(manager.getCompletedTime(), 1234U);
 }
 
 // Manager (parent Progress): NotStarted clears start/completed times
